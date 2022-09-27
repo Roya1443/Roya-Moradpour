@@ -1,0 +1,135 @@
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+import csv
+import datetime
+import openpyxl # for handling the excel sheets
+
+
+
+def CheckAllDataBase(textfile, excelfile):
+    FileStatus = 'OK'
+    from csv import writer
+    from datetime import datetime
+    now = datetime.now()
+    # TxtFile contains all the text data from the first sheet of mutations
+    TxtFile = ""
+
+    if os.path.exists(excelfile):
+        # get the name of the sheet currently open; necessary for getting correct sequence from seq file
+        workbook = openpyxl.load_workbook(excelfile)
+        sheetnames = workbook.sheetnames
+        for sheet in sheetnames :
+            Result,sheetname = CheckFunc(textfile,excelfile,sheet)            
+            print("The Sheet "+sheet+" Result is : ",Result)
+
+
+
+
+def CheckFunc(textfile, excelfile,sheet):
+    FileStatus = 'OK'
+    from csv import writer
+    from datetime import datetime
+    now = datetime.now()
+    # TxtFile contains all the text data from the first sheet of mutations
+    TxtFile = ""
+
+    if os.path.exists(excelfile):
+        # get the name of the sheet currently open; necessary for getting correct sequence from seq file
+        workbook = openpyxl.load_workbook(excelfile)
+        sheetnames = workbook.sheetnames
+        data = pd.read_excel(excelfile,sheet)
+        sheet_name = (sheet.split('_', 1))[0]
+
+    if os.path.exists(textfile):
+
+        fh = open(textfile, "r")
+        linelist = []
+        for line in fh:  # iterate by-lines over file-like
+            try:
+                # appends all the lines to a list to make cutting out the non-relevant sequences easier
+                linelist.append(line)
+
+            except IndexError:  # line has no chars
+                pass  # consider other handling
+        # cuts out everything but the sequence on the current sheet
+
+        # gets the index of the first appearance of the sheet name; marks the beginning of the correct sequence
+        firstind = linelist.index(next(filter(lambda ele: sheet_name in ele, linelist), None))
+
+        # use firstind to remove all the unnecessary stuff before it
+        linelist = linelist[firstind + 1 : ]
+
+        # gets the index of the next sequence (for a diff sheet); this ind and everything after is irrelevant
+        lastind = linelist.index(next(filter(lambda ele: ele[0] == ">", linelist), None))
+
+        # remove all the excess
+        linelist = linelist[ :lastind]
+
+        # concatenates the elements in the list and strips newline chars to get the final sequence
+        TxtFile = ''.join(linelist).replace("\n", "")
+        print(TxtFile)
+        fh.close()
+
+    K = data['mutant']  # get mutant data file from the lab data spreadsheet
+
+    for item in K:
+### Modified     
+        # 1 digit to N digit index case
+        
+        mutind = int(item[1:-1])-1
+
+####################### End of Modification
+
+    
+        # check for mutation presence
+        if item[0] == TxtFile[mutind]:  # index of the mutation
+            # mutant sequence: Use mutated position as the center of a window (window size is 101),
+            # and get the wt sequence and mutant sequence
+            wtseq = ""
+            mutseq = ""
+            if mutind >= 50:  # check to make sure window is appropriately sized
+                windowsize = 101
+            else:  # use max available window size w/o wrap around
+                windowsize = mutind * 2 + 1
+
+            # get the first half of the window and the center position
+            wtseq += TxtFile[int(mutind - (windowsize - 1) / 2): mutind] + item[0]  # center pos is original AA
+            mutseq += TxtFile[int(mutind - (windowsize - 1) / 2): mutind] + item[-1]  # center pos is new AA
+            # get second half of the window
+            # note that if the 2nd index is out of bounds, will just return the remainder of the sequence
+            wtseq += TxtFile[mutind + 1: int(mutind + (windowsize - 1) / 2 + 1)]
+            mutseq += TxtFile[mutind + 1: int(mutind + (windowsize - 1) / 2 + 1)]
+            # print out
+            print(item, " Condition OK ---> ", item[0], "==", TxtFile[mutind], " ", "wt: ", wtseq, "mut: ", mutseq)
+
+        else:
+            FileStatus = 'Error'
+
+
+    return FileStatus,sheetnames[0]
+
+
+
+
+
+
+
+
+FolderName = ""
+csvfileName = ""
+ProgBar1 = 0
+ProgBar2 = 0
+
+# Result=CheckFunc("seq.txt","lab-data.xlsx")
+Result,sheetname = CheckAllDataBase("sequence.txt", "Final data.xlsx")
+
+
+print('Finished')
+
+# In[ ]:
+
+
+
+
